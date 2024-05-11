@@ -1,2 +1,2 @@
 # Deepeptide
-Deepeptide is a generic deep learning-based pipeline that can discovers therapeutic oligopeptide leads for almost any indication of interest.
+Deepeptide is theoretically capable of identifying therapeutic oligopeptides for any indication without the need for indication-specific training data. Here is the main program of Deepeptide, developed for extracting the potential therapeutic oligopeptides from the provided protein sequences.
