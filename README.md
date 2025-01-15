@@ -31,7 +31,25 @@ For the second step, we extracted the oligopeptide candidates by the deep learni
 
 ### 2.1 Identification of oligopeptide candidates
 
-This is implemented by the deep learning model, of which main program (**<u>biopeptide_extraction.py</u>**) is deposited in the root path.
+This is implemented by the deep learning model, of which main program (**<u>biopeptide_extraction.py</u>**) is deposited in the root path. There are some important files deposited in the following subdirectories:
+
+#### 2.1.1 Data
+
+This subdirectory includes a file named  "Training Dataset.txt", the dataset for training the deep learning model. This dataset comprises 7,028 protein-derived biopeptides mapped to 9,175 protopeptides, obtained from UniProt and publicly available therapeutic peptide databases. Each amino acid within the protopeptides was subsequently labeled according to its positional information within the parent proteins using the BIEO scheme. In this scheme, amino acids are assigned one of four tags: 'B', 'I', 'E', or 'O', indicating the amino acid is in the starting point, internal region, endpoint and outside of a biopeptide, respectively.
+
+It is worth noting that sequence masking information plays a crucial role in determining model performance during training. This is primarily because identified biopeptides within protopeptides remain relatively scarce. When using the BIEO scheme for labeling, regions where biopeptides have not yet been discovered are typically labeled as 'O'. This approach inevitably introduces a large amount of 'false-negative' information. Therefore, incorporating appropriate sequence masking information during model training is highly beneficial for achieving a balanced model performance in terms of false positives and false negatives. However, there is no consensus on what constitutes the optimal sequence masking strategy. As a result, this type of information has not been explicitly annotated in "Training Dataset.txt".
+
+#### 2.2.2 models
+
+This subdirectory includes a file named  "dl_model.py", the details of the deep learning model. Specifically, the model is developed with three main components: 1) Input Representation: We fine-tuned the state-of-the-art pre-training protein large language model , ESM-2, to integrate global evolutionary information and general semantic patterns of proteins; 2) Context Encoder: A bidirectional Long Short-Term Memory (Bi-LSTM) network captures context dependencies, crucial for extracting the targeted subsequence (in this case, the oligopeptide) from the larger sequence (the protopeptide); 3) Tag Decoder: We employed a Conditional Random Field (CRF) model to assign tags to each amino acid, indicating its membership as part of the biopeptide.
+
+#### 2.2.3 utils
+
+This subdirectory includes three files as follows.
+
+- "data_process.py" is a code script for preparing Training Dataset and Prediction Dataset.
+- "metrics.py" is a code script for calculate performance metrics including Recall, Precision and F1-score for the deep learning model.
+- "param_configs" is a configuration file that records hyperparameters of the deep learning model.
 
 ### 2.2 prioritization of oligopeptide candidates
 
