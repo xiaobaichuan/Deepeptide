@@ -32,20 +32,6 @@ def create_data_loader(data, configs):
     return DataLoader(ds, batch_size=configs.batch_size)
 
 
-def Encoding(data, batch_converter, model):
-    ## data = [(ID, sequence)]
-    batch_labels, batch_strs, batch_tokens = batch_converter(data)
-    with torch.no_grad():
-        results = model(batch_tokens, repr_layers=[33], return_contacts=True)
-    
-    res = {}
-    for i in range(len(data)):
-        seqlength = len(data[i][1])
-        token_representations = results["representations"][33][i][1:seqlength+1].numpy()
-        res[data[i][0]] = token_representations
-    return res
-
-
 def prepare_labeled_data(data_path, configs):
     with open(data_path, 'r') as f:
         tmp = f.read().split()
