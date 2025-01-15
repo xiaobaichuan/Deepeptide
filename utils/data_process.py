@@ -32,23 +32,6 @@ def create_data_loader(data, configs):
     return DataLoader(ds, batch_size=configs.batch_size)
 
 
-def is_all_BIE(sequence):  ## sequence is the variable recording 'BIEO'
-    BIE_length = 0
-    start = None
-    for i, label in enumerate(sequence):
-        if label.startswith("B"):  # 实体开始
-            start = i
-        elif label.startswith("E") and start is not None:  # 实体结束
-            BIE_length += i-start+1
-            start = None
-        elif label == "O":  # 遇到外部标记，重置开始位置
-            start = None
-    if BIE_length == len(sequence):
-        return True
-    else:
-        return False
-
-
 def Encoding(data, batch_converter, model):
     ## data = [(ID, sequence)]
     batch_labels, batch_strs, batch_tokens = batch_converter(data)
