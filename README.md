@@ -60,7 +60,9 @@ This subdirectory includes three files as follows.
 When train/validate the model, users should prepare an data file according to the following format:
 
 >\>E3YBA4
+>
 >MTVKIAQKKVLPVIGRAAALCGSCYPCSCM
+>
 >OOOOOOOOOOOOOOOOOOOBIIIIIIIIIE
 
 Clearly, each training data unit consists of three rows:
@@ -71,6 +73,7 @@ iii.	The third row annotates the sequence, where ‘B’ and ‘E’ indicate th
 When test the model, users should prepare an data file according to the following format:
 
 >\>Test_Sequence_0001
+>
 >MTVKIAQKKVLPVIGRAAALCGSCYPCSCM
 
 Each training data unit consists of two rows, that is, sequence ID and amino acid sequence, and there is no need for providing label information in this case.
