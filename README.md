@@ -80,7 +80,9 @@ Each training data unit consists of two rows, that is, sequence ID and amino aci
 When test the model, or in other words, make inference/prediction, there is an output file to be generated, like the following format:
 
 >\>Test_Sequence_0001
+>
 >MTVKIAQKKVLPVIGRAAALCGSCYPCSCM
+>
 >OOOOOOOOOOOOOOOOOOOBIIIIIIIIIE
 
 Each training data unit consists of two rows, that is, sequence ID, amino acid sequence and annotation results for each amino acids.
