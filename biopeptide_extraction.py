@@ -151,23 +151,13 @@ elif not configs.is_predicting:
     res_file.close()
 
 else: # prediction mode
-    data_size = 100
-    pred_data = read_fasta(root_path+'data/predict/validation.fasta')
-    epoches = len(pred_data[0])//(data_size+1)+1
-    
-    esm2, alphabet = esm.pretrained.load_model_and_alphabet(configs.esm_path)
-    batch_converter = alphabet.get_batch_converter()
-    esm2.eval()
     model = torch.load(model_path).to(device)
     model = model.eval()
     print('Prediction process starts.')
     
-    for epoch in range(epoches):
-        start, end = epoch*data_size, (epoch+1)*data_size
-        sub_pred_data = [pred_data[0][start:end], pred_data[1][start:end]]
-        pred_set = prepare_predict_data(sub_pred_data, batch_converter, esm2, configs)
-        pred_data_loader = create_data_loader(pred_set, configs)
-        f = open(root_path+'data/predict/validation.txt', 'a')
+    pred_set = prepare_predict_data(root_path+'data/predict/prediction.fasta', configs)
+    pred_data_loader = create_data_loader(pred_set, configs)
+    with open(root_path+'data/predict/prediction.txt', 'w') as f:
         with torch.no_grad():
             for sample in tqdm(pred_data_loader, 'prediction'):
                 sequence_tensor = sample['sequence_tensor'].to(device)
@@ -179,4 +169,4 @@ else: # prediction mode
                     for j in range(len(out[i])):
                         tags += configs.idx2tag[out[i][j]]
                     f.write(f'{ID}\n{sequence}\n{tags}\n')
-        f.close()
+
