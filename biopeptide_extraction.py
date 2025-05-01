@@ -1,17 +1,18 @@
 import os
-# import esm
+import esm
 import numpy as np
 import torch
-# import torch.autograd as autograd
+import torch.autograd as autograd
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 from utils.param_configs import Configs
-from utils.data_process import create_data_loader, train_or_valid, prepare_predict_data
+from utils.data_process import read_fasta, create_data_loader, train_or_valid, prepare_predict_data
 from utils.metrics import metrics
 from transformers.optimization import get_cosine_schedule_with_warmup
 
 
+###### training function
 def train_epoch(model, data_loader, optimizer, scheduler, configs):
     model = model.train()
     loss_list = []
@@ -30,7 +31,7 @@ def train_epoch(model, data_loader, optimizer, scheduler, configs):
 
     return np.mean(loss_list)
 
-
+# validating function
 def eval_epoch(model, data_loader, configs):
     model = model.eval()
     with torch.no_grad():
@@ -38,7 +39,7 @@ def eval_epoch(model, data_loader, configs):
         for sample in tqdm(data_loader, 'valid'):
             sequence_tensor = sample['sequence_tensor'].to(configs.device)
             mask_tensor = sample['mask'].to(configs.device)
-            # label_tensor = sample['label_tensor'].to(configs.device)
+            label_tensor = sample['label_tensor'].to(configs.device)
             label = sample['label']
             out = model(sequence_tensor, mask_tensor)
             
@@ -56,33 +57,40 @@ def eval_epoch(model, data_loader, configs):
     return [item[1] for item in results[0].items()]
 
 
+###### loading pre-defined parameters
 torch.manual_seed(1)
 configs = Configs()
 device, version = configs.device, configs.version
 print('{} is available'.format(device))
 
 
+#### loading data
+root_path = './'  # location of main program, specified by users
+data_path = root_path+'/data/train_or_valid/'
+model_path = root_path+'/Deepeptide/models/model.pkl'
+
 if configs.is_training:
-    if os.path.exists('./data/train.pt') and not configs.reload:
-        train_set = torch.load('./data/train.pt')
-        valid_set = torch.load('valid.pt')
+    if os.path.exists(data_path+'train.pt') and not configs.reload:
+        train_set = torch.load(data_path+'train.pt')
+        valid_set = torch.load(data_path+'valid.pt')
     else:
-        train_set = train_or_valid('./data/train', configs)
-        valid_set = train_or_valid('./data/valid', configs)
+        train_set = train_or_valid(data_path+'train', configs)
+        valid_set = train_or_valid(data_path+'valid', configs)
     train_data_loader = create_data_loader(train_set, configs)
     valid_data_loader = create_data_loader(valid_set, configs)
 elif not configs.is_predicting:
-    if os.path.exists('./data/valid.pt'):
-        valid_set = torch.load('./data/valid.pt')
+    if os.path.exists(data_path+'valid.pt'):
+        valid_set = torch.load(data_path+'valid.pt')
     else:
-        valid_set = train_or_valid('./data/valid', configs)
+        valid_set = train_or_valid(data_path+'valid', configs)
     valid_data_loader = create_data_loader(valid_set, configs)
 
-
+######################################## training, validating & test ###################################
 if configs.is_training:
-    from models.dl_model import NER
+    from models.dl_model2 import NER
     model = NER(configs).to(device)
     optimizer = optim.Adam(model.parameters(), lr=configs.learning_rate)
+    # scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
     train_steps_per_epoch = len(train_set[0]) // configs.batch_size
     scheduler = get_cosine_schedule_with_warmup(optimizer,
                                                 num_warmup_steps=(configs.num_epochs//50)*train_steps_per_epoch,
@@ -94,7 +102,7 @@ if configs.is_training:
         print('——'*10, f'Epoch {epoch + 1}/{EPOCHS}', '——'*10)
         train_loss = train_epoch(model, train_data_loader, optimizer, scheduler, configs)
         scheduler.step()
-        print(f'Train loss : {round(train_loss, 2)}')
+        print(f'Train loss: {round(train_loss, 2)}')
         
         recal, prec, F1 = eval_epoch(model, valid_data_loader, configs)
 
@@ -103,21 +111,63 @@ if configs.is_training:
             metric1_best = metric1
             metric2_best = metric2
             print('save the best model until now.')
-            torch.save(model, './models/DL_model.pkl')
+            torch.save(model, model_path)
             pat_cnt = 0
         else:
             pat_cnt += 1
         if epoch > configs.min_epoch_num and pat_cnt > configs.patience_num:
             break
 
-else:
-    model = torch.load('./models/DL_model.pkl').to(device)
+elif not configs.is_predicting:
+# validation mode
+    model = torch.load(model_path).to(device)
+    model = model.eval()
+    res_file = open(root_path+'data/predict/vaild_'+version+'.txt', 'w')
+    
+    with torch.no_grad():
+        predict_tag, true_tag = [], []
+        for sample in tqdm(valid_data_loader, 'valid'):
+            sequence_tensor = sample['sequence_tensor'].to(device)
+            mask_tensor = sample['mask'].to(device)
+            out = model(sequence_tensor, mask_tensor)
+            sequence = sample['sequence']
+            label = sample['label']
+            
+            for i in range(len(out)):
+                tmp = []
+                for j in range(len(out[i])):
+                    tmp.append(configs.idx2tag[out[i][j]])
+                predict_tag.append(tmp)
+                true_tag.append(list(label[i]))
+                res_file.write('RawSequence: ' + sequence[i] + '\n')
+                res_file.write('GroundTruth: ' + label[i] + '\n')
+                res_file.write('PredictTags: ' + ' '.join(tmp) + '\n')
+        
+        results = metrics(true_tag, predict_tag)
+        for tolerance, scores in results.items():
+            res_file.write(f"Tolerance: {tolerance}, Recall: {scores['recall']:.2f}, Precision: \
+                           {scores['precision']:.2f}, F1 Score: {scores['f1_score']:.2f}")
+        
+    res_file.close()
+
+else: # prediction mode
+    data_size = 100
+    pred_data = read_fasta(root_path+'data/predict/validation.fasta')
+    epoches = len(pred_data[0])//(data_size+1)+1
+    
+    esm2, alphabet = esm.pretrained.load_model_and_alphabet(configs.esm_path)
+    batch_converter = alphabet.get_batch_converter()
+    esm2.eval()
+    model = torch.load(model_path).to(device)
     model = model.eval()
     print('Prediction process starts.')
     
-    with open('./data/prediction.txt', 'w') as f:
-        pred_set = prepare_predict_data('./data/prediction.fasta', configs)
+    for epoch in range(epoches):
+        start, end = epoch*data_size, (epoch+1)*data_size
+        sub_pred_data = [pred_data[0][start:end], pred_data[1][start:end]]
+        pred_set = prepare_predict_data(sub_pred_data, batch_converter, esm2, configs)
         pred_data_loader = create_data_loader(pred_set, configs)
+        f = open(root_path+'data/predict/validation.txt', 'a')
         with torch.no_grad():
             for sample in tqdm(pred_data_loader, 'prediction'):
                 sequence_tensor = sample['sequence_tensor'].to(device)
@@ -129,3 +179,4 @@ else:
                     for j in range(len(out[i])):
                         tags += configs.idx2tag[out[i][j]]
                     f.write(f'{ID}\n{sequence}\n{tags}\n')
+        f.close()
